@@ -1,5 +1,8 @@
 # Proxylist
 
+[![Build Status](https://travis-ci.com/NovikovRoman/proxylist.svg?branch=master)](https://travis-ci.com/NovikovRoman/proxylist)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NovikovRoman/proxylist)](https://goreportcard.com/report/github.com/NovikovRoman/proxylist)
+![GitHub](https://img.shields.io/github/license/NovikovRoman/proxylist)
 > Library for working with proxy lists
 
 ## Install
