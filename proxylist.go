@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type proxylist struct {
+type List struct {
 	sync.RWMutex
 	items []*proxy
 }
@@ -21,20 +21,20 @@ type proxy struct {
 }
 
 // NewProxylist returns a structure pointer.
-func NewProxylist() (p *proxylist) {
-	p = &proxylist{
+func NewProxylist() (l *List) {
+	l = &List{
 		items: []*proxy{},
 	}
 	return
 }
 
 // String returns a proxy list with busy tags (+/-).
-func (p *proxylist) String() string {
-	p.RLock()
-	defer p.RUnlock()
+func (l *List) String() string {
+	l.RLock()
+	defer l.RUnlock()
 
 	res := ""
-	for _, item := range p.items {
+	for _, item := range l.items {
 		busy := "-"
 		if item.busy {
 			busy = "+"
@@ -45,30 +45,30 @@ func (p *proxylist) String() string {
 }
 
 // FromFile reads a list from a file.
-func (p *proxylist) FromFile(filename string) (bad []string, err error) {
+func (l *List) FromFile(filename string) (bad []string, err error) {
 	var b []byte
 	if b, err = ioutil.ReadFile(filename); err != nil {
 		return
 	}
-	return p.parsing(b)
+	return l.parsing(b)
 }
 
 // FromReader reads a list from io.Reader.
-func (p *proxylist) FromReader(r io.Reader) (bad []string, err error) {
+func (l *List) FromReader(r io.Reader) (bad []string, err error) {
 	var b []byte
 	if b, err = ioutil.ReadAll(r); err != nil {
 		return
 	}
-	return p.parsing(b)
+	return l.parsing(b)
 }
 
 // parsing parses proxy list.
-func (p *proxylist) parsing(b []byte) (bad []string, err error) {
-	p.Lock()
-	defer p.Unlock()
+func (l *List) parsing(b []byte) (bad []string, err error) {
+	l.Lock()
+	defer l.Unlock()
 
 	bad = []string{}
-	p.items = []*proxy{}
+	l.items = []*proxy{}
 	for _, row := range bytes.Split(b, []byte("\n")) {
 		row = bytes.TrimSpace(row)
 		if len(row) == 0 {
@@ -81,32 +81,32 @@ func (p *proxylist) parsing(b []byte) (bad []string, err error) {
 			continue
 		}
 
-		p.items = append(p.items, &proxy{
+		l.items = append(l.items, &proxy{
 			busy: false,
 			url:  u,
 		})
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	shuffleProxy := make([]*proxy, len(p.items))
-	for i, j := range rand.Perm(len(p.items)) {
-		shuffleProxy[i] = p.items[j]
+	shuffleProxy := make([]*proxy, len(l.items))
+	for i, j := range rand.Perm(len(l.items)) {
+		shuffleProxy[i] = l.items[j]
 	}
 
-	p.items = shuffleProxy
+	l.items = shuffleProxy
 	return
 }
 
 // GetFree returns a free proxy and marks it as busy.
-func (p *proxylist) GetFree() *url.URL {
-	p.Lock()
-	defer p.Unlock()
+func (l *List) GetFree() *url.URL {
+	l.Lock()
+	defer l.Unlock()
 
 	// случайное прокси
 	rand.Seed(time.Now().UnixNano())
-	shuffleProxy := make([]*proxy, len(p.items))
-	for i, j := range rand.Perm(len(p.items)) {
-		shuffleProxy[i] = p.items[j]
+	shuffleProxy := make([]*proxy, len(l.items))
+	for i, j := range rand.Perm(len(l.items)) {
+		shuffleProxy[i] = l.items[j]
 	}
 
 	for _, item := range shuffleProxy {
@@ -120,74 +120,74 @@ func (p *proxylist) GetFree() *url.URL {
 }
 
 // SetFree removes the busy flag from the proxy.
-func (p *proxylist) SetFree(u *url.URL) {
-	ind := p.Index(u)
+func (l *List) SetFree(u *url.URL) {
+	ind := l.Index(u)
 	if ind < 0 {
 		return
 	}
 
-	p.Lock()
-	p.items[ind].busy = false
-	p.Unlock()
+	l.Lock()
+	l.items[ind].busy = false
+	l.Unlock()
 }
 
 // isBusy returns whether the proxy is busy.
 // Always returns false if no proxy is found.
-func (p *proxylist) isBusy(u *url.URL) bool {
-	ind := p.Index(u)
+func (l *List) isBusy(u *url.URL) bool {
+	ind := l.Index(u)
 	if ind < 0 {
 		return false
 	}
 
-	p.RLock()
-	defer p.RUnlock()
-	return p.items[ind].busy
+	l.RLock()
+	defer l.RUnlock()
+	return l.items[ind].busy
 }
 
 // setBusy sets the busy flag to the proxy.
-func (p *proxylist) setBusy(u *url.URL) {
-	ind := p.Index(u)
+func (l *List) setBusy(u *url.URL) {
+	ind := l.Index(u)
 	if ind < 0 {
 		return
 	}
 
-	p.Lock()
-	p.items[ind].busy = true
-	p.Unlock()
+	l.Lock()
+	l.items[ind].busy = true
+	l.Unlock()
 }
 
 // Num returns the total number of proxies.
-func (p *proxylist) Num() int {
-	p.RLock()
-	defer p.RUnlock()
-	return len(p.items)
+func (l *List) Num() int {
+	l.RLock()
+	defer l.RUnlock()
+	return len(l.items)
 }
 
 // NumBusy returns the number of busy proxies.
-func (p *proxylist) NumBusy() (numBusy int) {
-	p.RLock()
-	for _, item := range p.items {
+func (l *List) NumBusy() (numBusy int) {
+	l.RLock()
+	for _, item := range l.items {
 		if item.busy {
 			numBusy++
 		}
 	}
-	p.RUnlock()
+	l.RUnlock()
 	return
 }
 
 // NumFree returns the number of free proxies.
-func (p *proxylist) NumFree() (numFree int) {
-	return p.Num() - p.NumBusy()
+func (l *List) NumFree() (numFree int) {
+	return l.Num() - l.NumBusy()
 }
 
 // Index returns the proxy index in the array.
 // returns -1 if not found.
-func (p *proxylist) Index(u *url.URL) int {
-	p.RLock()
-	defer p.RUnlock()
+func (l *List) Index(u *url.URL) int {
+	l.RLock()
+	defer l.RUnlock()
 
-	for i := range p.items {
-		if p.items[i].url.String() == u.String() {
+	for i := range l.items {
+		if l.items[i].url.String() == u.String() {
 			return i
 		}
 	}
