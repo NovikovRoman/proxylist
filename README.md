@@ -24,7 +24,7 @@ if err != nil {
 
 or
 
-```
+```go
 p := proxylist.NewProxylist()
 f, err := os.Open("proxylist.txt")
 if err != nil {
