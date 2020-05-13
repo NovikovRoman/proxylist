@@ -20,6 +20,7 @@ type proxy struct {
 	url  *url.URL
 }
 
+// NewProxylist returns a structure pointer.
 func NewProxylist() (p *proxylist) {
 	p = &proxylist{
 		items: []*proxy{},
@@ -27,7 +28,7 @@ func NewProxylist() (p *proxylist) {
 	return
 }
 
-// String возвращает список прокси с метками занятости.
+// String returns a proxy list with busy tags (+/-).
 func (p *proxylist) String() string {
 	p.RLock()
 	defer p.RUnlock()
@@ -43,25 +44,26 @@ func (p *proxylist) String() string {
 	return res
 }
 
-// FromFile читает список из файла
+// FromFile reads a list from a file.
 func (p *proxylist) FromFile(filename string) (bad []string, err error) {
 	var b []byte
 	if b, err = ioutil.ReadFile(filename); err != nil {
 		return
 	}
-	return p.load(b)
+	return p.parsing(b)
 }
 
-// FromReader читает список из io.Reader
+// FromReader reads a list from io.Reader.
 func (p *proxylist) FromReader(r io.Reader) (bad []string, err error) {
 	var b []byte
 	if b, err = ioutil.ReadAll(r); err != nil {
 		return
 	}
-	return p.load(b)
+	return p.parsing(b)
 }
 
-func (p *proxylist) load(b []byte) (bad []string, err error) {
+// parsing parses proxy list.
+func (p *proxylist) parsing(b []byte) (bad []string, err error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -95,7 +97,7 @@ func (p *proxylist) load(b []byte) (bad []string, err error) {
 	return
 }
 
-// GetFree возвращает свободный прокси и помечает его как занятый.
+// GetFree returns a free proxy and marks it as busy.
 func (p *proxylist) GetFree() *url.URL {
 	p.Lock()
 	defer p.Unlock()
@@ -117,7 +119,7 @@ func (p *proxylist) GetFree() *url.URL {
 	return nil
 }
 
-// SetFree снимает флаг busy на прокси.
+// SetFree removes the busy flag from the proxy.
 func (p *proxylist) SetFree(u *url.URL) {
 	ind := p.Index(u)
 	if ind < 0 {
@@ -129,7 +131,8 @@ func (p *proxylist) SetFree(u *url.URL) {
 	p.Unlock()
 }
 
-// isBusy возвращает занят ли прокси. Всегда возвращает false, если прокси не найден.
+// isBusy returns whether the proxy is busy.
+// Always returns false if no proxy is found.
 func (p *proxylist) isBusy(u *url.URL) bool {
 	ind := p.Index(u)
 	if ind < 0 {
@@ -141,7 +144,7 @@ func (p *proxylist) isBusy(u *url.URL) bool {
 	return p.items[ind].busy
 }
 
-// setBusy устанавливает флаг busy на прокси.
+// setBusy sets the busy flag to the proxy.
 func (p *proxylist) setBusy(u *url.URL) {
 	ind := p.Index(u)
 	if ind < 0 {
@@ -153,14 +156,14 @@ func (p *proxylist) setBusy(u *url.URL) {
 	p.Unlock()
 }
 
-// Num возвращает общее количество прокси.
+// Num returns the total number of proxies.
 func (p *proxylist) Num() int {
 	p.RLock()
 	defer p.RUnlock()
 	return len(p.items)
 }
 
-// NumBusy возвращает количество занятых прокси.
+// NumBusy returns the number of busy proxies.
 func (p *proxylist) NumBusy() (numBusy int) {
 	p.RLock()
 	for _, item := range p.items {
@@ -172,12 +175,13 @@ func (p *proxylist) NumBusy() (numBusy int) {
 	return
 }
 
-// NumFree возвращает количество свободных прокси.
+// NumFree returns the number of free proxies.
 func (p *proxylist) NumFree() (numFree int) {
 	return p.Num() - p.NumBusy()
 }
 
-// Index возвращает индекс прокси в массиве, если не найден возвращает -1.
+// Index returns the proxy index in the array.
+// returns -1 if not found.
 func (p *proxylist) Index(u *url.URL) int {
 	p.RLock()
 	defer p.RUnlock()

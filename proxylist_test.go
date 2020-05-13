@@ -29,6 +29,7 @@ func TestNewProxylist(t *testing.T) {
 
 	bad, err = p.FromFile(testfile)
 	require.Nil(t, err)
+	require.Len(t, bad, 0)
 	require.Equal(t, p.Num(), 6)
 	require.Equal(t, p.NumFree(), p.Num())
 
@@ -41,6 +42,7 @@ func TestNewProxylist(t *testing.T) {
 	require.Nil(t, err)
 	bad, err = p.FromReader(f)
 	require.Nil(t, err)
+	require.Len(t, bad, 0)
 	require.Nil(t, f.Close())
 
 	require.Equal(t, p.Num(), 6)
