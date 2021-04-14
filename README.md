@@ -10,15 +10,17 @@
 ## Install
 
 ```shell
-go get github.com/NovikovRoman/proxylist
+go get github.com/NovikovRoman/proxylist.v2
 ```
 
 ## Usage
 
 Download proxy list:
+
 ```go
-p := proxylist.NewProxylist()
-bad, err := p.FromFile(testfile)
+p := proxylist.NewList()
+bad, err := p.FromFile("proxylist.txt", proxylist.Ip4)
+// or bad, err := p.FromFileIP4("filename")
 if err != nil {
     panic(err)
 }
@@ -27,13 +29,14 @@ if err != nil {
 or
 
 ```go
-p := proxylist.NewProxylist()
+p := proxylist.NewList()
 f, err := os.Open("proxylist.txt")
 if err != nil {
     panic(err)
 }
 
-bad, err := p.FromReader(f)
+bad, err := p.FromReader(f, proxylist.Ip4)
+// or bad, err := p.FromReaderIP4(f)
 if err != nil {
     panic(err)
 }
@@ -45,8 +48,10 @@ if err != nil {
 The loaded a list shuffled.
 
 Get a free proxy:
+
 ```go
-proxy := p.GetFree()
+proxy := p.GetFreeIP4()
+// or proxy := p.GetFree(proxylist.Ip4)
 if proxy == nil {
     panic("No free proxies.")
 }
@@ -55,22 +60,29 @@ if proxy == nil {
 After using the proxy, you need to free it:
 
 ```go
-p.SetFree(proxy)
+p.SetFreeIP4(proxy)
+// or p.SetFree(proxylist.Ip4)
 ```
 
 Total number of proxies:
+
 ```go
-p.Num()
+p.NumIP4()
+// or p.Num(proxylist.Ip4)
 ```
 
 Number of free proxies:
+
 ```go
-p.NumFree()
+p.NumFreeIP4()
+// or p.NumFree(proxylist.Ip4)
 ```
 
 Number of busy proxies:
+
 ```go
-p.NumBusy()
+p.NumBusyIP4()
+// or p.NumBusy(proxylist.Ip4)
 ```
 
 ## Tests
@@ -80,4 +92,5 @@ go test -race -v
 ```
 
 ## License
+
 [MIT License](LICENSE) © Roman Novikov
