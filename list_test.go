@@ -30,7 +30,7 @@ bad-proxy.com
 `)
 )
 
-func TestNewList(t *testing.T) {
+func TestList_FromReader(t *testing.T) {
 	var (
 		err    error
 		badIP4 []string
@@ -49,18 +49,36 @@ func TestNewList(t *testing.T) {
 	require.Equal(t, l.NumFreeIP4(), 3)
 	require.Equal(t, l.NumBusyIP4(), 1)
 
-	_ = l.GetFree(Ip4)
+	_ = l.GetFreeIP4()
 	_ = l.GetFree(Ip4)
 	_ = l.GetFree(Ip4)
 	require.Equal(t, l.NumFreeIP4(), 0)
 	require.Equal(t, l.NumBusyIP4(), 4)
 
-	p := l.GetFree(Ip6)
+	l.SetFree(&url.URL{
+		Scheme: "http",
+		Host:   "proxy2",
+	}, Ip4)
+	require.Equal(t, l.NumFreeIP4(), 1)
+	require.Equal(t, l.NumBusyIP4(), 3)
+
+	p := l.GetFree(-1)
+	require.Nil(t, p)
+
+	p = l.GetFree(Ip6)
 	require.Equal(t, l.NumFreeIP6(), 3)
 	require.Equal(t, l.NumBusyIP6(), 1)
 	l.SetFree(p, Ip6)
 	require.Equal(t, l.NumFreeIP6(), 4)
 	require.Equal(t, l.NumBusyIP6(), 0)
+
+	l = NewList()
+	badIP4, err = l.FromReaderIP4(bytes.NewReader(ip4))
+	require.Nil(t, err)
+	require.Len(t, badIP4, 1)
+	badIP6, err = l.FromReaderIP6(bytes.NewReader(ip6))
+	require.Nil(t, err)
+	require.Len(t, badIP6, 1)
 }
 
 func TestList_FromFile_bad(t *testing.T) {
@@ -80,7 +98,7 @@ func TestList_FromFile_bad(t *testing.T) {
 	require.Equal(t, p.NumIP6(), 0)
 	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
 
-	badIP6, err = p.FromFile(testfileBad, Ip6)
+	badIP6, err = p.FromFileIP6(testfileBad)
 	require.Nil(t, err)
 
 	require.Len(t, badIP4, 2)
@@ -261,7 +279,45 @@ func TestList_BusyFree(t *testing.T) {
 		Path:   "/",
 	}
 
-	p.setBusy(unknownProxy, Ip6)
-	p.SetFree(unknownProxy, Ip6)
+	proxyFromTestfile := &url.URL{
+		Scheme: "https",
+		Host:   "12.33.12.34:12",
+	}
+
+	p.setBusyIP4(proxyFromTestfile)
+	p.setBusy(unknownProxy, Ip4)
+	require.True(t, p.isBusy(proxyFromTestfile, Ip4))
+
+	p.SetFreeIP4(unknownProxy)
+	require.False(t, p.isBusyIP4(unknownProxy))
 	require.False(t, p.isBusyIP6(unknownProxy))
+}
+
+func TestList_refresh(t *testing.T) {
+	var (
+		bad []string
+		err error
+	)
+	p := NewList()
+	_, err = p.refresh([]byte("http://127.0.0.1"), -1)
+	require.NotNil(t, err)
+
+	bad, err = p.refresh([]byte("fdgsdf"), Ip6)
+	require.Nil(t, err)
+	require.Len(t, bad, 1)
+}
+
+func TestList_String(t *testing.T) {
+	p := NewList()
+	_, _ = p.FromFile(testfile, Ip6)
+	_, _ = p.FromFileIP4(testfile)
+
+	p.GetFreeIP6()
+
+	sIP4 := p.StringIP4()
+	sIP6 := p.StringIP6()
+	require.Len(t, sIP4, 236)
+	require.Equal(t, len(sIP6), len(sIP4))
+
+	require.Equal(t, len(p.String()), len(sIP6)*2+1) // + \n
 }

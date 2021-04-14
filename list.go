@@ -247,8 +247,11 @@ func (l *List) NumFreeIP6() (numFree int) {
 }
 
 // parsing parses proxy list.
-func (l *List) parsing(b []byte) (good []*proxy, bad []string, err error) {
-	var u *url.URL
+func (l *List) parsing(b []byte) (good []*proxy, bad []string) {
+	var (
+		u   *url.URL
+		err error
+	)
 
 	bad = []string{}
 	good = []*proxy{}
@@ -274,7 +277,13 @@ func (l *List) parsing(b []byte) (good []*proxy, bad []string, err error) {
 // refresh updates the proxy list. typeIP - proxy type (Ip4 or Ip6).
 func (l *List) refresh(b []byte, typeIP int) (bad []string, err error) {
 	var good []*proxy
-	if good, bad, err = l.parsing(b); err != nil {
+
+	if typeIP != Ip4 && typeIP != Ip6 {
+		err = errors.New("Unknown type. ")
+		return
+	}
+
+	if good, bad = l.parsing(b); len(good) == 0 {
 		return
 	}
 
@@ -284,9 +293,6 @@ func (l *List) refresh(b []byte, typeIP int) (bad []string, err error) {
 
 	case Ip6:
 		l.refreshIP6(good)
-
-	default:
-		err = errors.New("Unknown type. ")
 	}
 	return
 }
@@ -309,23 +315,21 @@ func (l *List) refreshIP6(p []*proxy) {
 // Always returns false if no proxy is found or unknown type.
 func (l *List) isBusy(u *url.URL, typeIP int) bool {
 	var index int
+	// l.Index -1 if unknown type.
 	if index = l.Index(u, typeIP); index < 0 {
 		return false
 	}
 
-	switch typeIP {
-	case Ip4:
+	if typeIP == Ip4 {
 		l.ip4Mutex.RLock()
 		defer l.ip4Mutex.RUnlock()
 		return l.ip4[index].busy
-
-	case Ip6:
-		l.ip6Mutex.RLock()
-		defer l.ip6Mutex.RUnlock()
-		return l.ip6[index].busy
 	}
 
-	return false
+	// Ip6
+	l.ip6Mutex.RLock()
+	defer l.ip6Mutex.RUnlock()
+	return l.ip6[index].busy
 }
 
 // isBusyIP4 returns whether the proxy is busy.
