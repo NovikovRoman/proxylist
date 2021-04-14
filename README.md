@@ -10,7 +10,7 @@
 ## Install
 
 ```shell
-go get github.com/NovikovRoman/proxylist.v2
+go get github.com/NovikovRoman/proxylist/v2
 ```
 
 ## Usage

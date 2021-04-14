@@ -1,4 +1,4 @@
-module github.com/NovikovRoman/proxylist
+module github.com/NovikovRoman/proxylist/v2
 
 go 1.14
 
