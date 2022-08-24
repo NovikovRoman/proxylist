@@ -12,7 +12,9 @@ import (
 )
 
 const (
+	// IP4 Proxy type
 	Ip4 = iota
+	// IP6 Proxy type
 	Ip6
 )
 
@@ -34,11 +36,12 @@ func NewList() (l *List) {
 	return
 }
 
-// String returns a proxy list with busy tags (+/-).
+// String returns a proxy list.
 func (l *List) String() string {
 	return l.StringIP4() + "\n" + l.StringIP6()
 }
 
+// StringIP4 returns a proxy list IP4.
 func (l *List) StringIP4() (s string) {
 	l.ip4Mutex.RLock()
 	s = listString(l.ip4, Ip4)
@@ -46,6 +49,7 @@ func (l *List) StringIP4() (s string) {
 	return
 }
 
+// StringIP6 returns a proxy list IP6.
 func (l *List) StringIP6() (s string) {
 	l.ip6Mutex.RLock()
 	s = listString(l.ip6, Ip6)
@@ -397,10 +401,14 @@ func (l *List) Index(u *url.URL, typeIP int) (index int) {
 	return -1
 }
 
+// IndexIP4 returns the proxy index in the array IP4.
+// returns -1 if not found.
 func (l *List) IndexIP4(u *url.URL) (index int) {
 	return l.Index(u, Ip4)
 }
 
+// IndexIP6 returns the proxy index in the array IP6.
+// returns -1 if not found.
 func (l *List) IndexIP6(u *url.URL) (index int) {
 	return l.Index(u, Ip6)
 }
