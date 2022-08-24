@@ -2,10 +2,12 @@ package proxylist
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
 	"net/url"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -45,40 +47,59 @@ func TestList_FromReader(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, badIP6, 1)
 
-	_ = l.GetFree(Ip4)
-	require.Equal(t, l.NumFreeIP4(), 3)
-	require.Equal(t, l.NumBusyIP4(), 1)
+	resource1 := "parser_site.com"
+	resource2 := "parser_site.ru"
 
-	_ = l.GetFreeIP4()
-	_ = l.GetFree(Ip4)
-	_ = l.GetFree(Ip4)
-	require.Equal(t, l.NumFreeIP4(), 0)
-	require.Equal(t, l.NumBusyIP4(), 4)
+	_ = l.GetFree(resource1, Ip4)
+	assert.Equal(t, l.NumFreeIP4(resource1), 3)
+	assert.Equal(t, l.NumBusyIP4(resource1), 1)
+	assert.Equal(t, l.NumFreeIP4(resource2), 4)
+	assert.Equal(t, l.NumBusyIP4(resource2), 0)
 
-	l.SetFree(&url.URL{
+	_ = l.GetFreeIP4(resource1)
+	_ = l.GetFree(resource1, Ip4)
+	_ = l.GetFree(resource1, Ip4)
+	assert.Equal(t, l.NumFreeIP4(resource1), 0)
+	assert.Equal(t, l.NumBusyIP4(resource1), 4)
+	assert.Equal(t, l.NumFreeIP4(resource2), 4)
+	assert.Equal(t, l.NumBusyIP4(resource2), 0)
+
+	l.SetFree(resource1, &url.URL{
 		Scheme: "http",
 		Host:   "proxy2",
 	}, Ip4)
-	require.Equal(t, l.NumFreeIP4(), 1)
-	require.Equal(t, l.NumBusyIP4(), 3)
+	l.SetFree(resource1, &url.URL{
+		Scheme: "http",
+		Host:   "proxy12", // no such proxy
+	}, Ip4)
+	assert.Equal(t, l.NumFreeIP4(resource1), 1)
+	assert.Equal(t, l.NumBusyIP4(resource1), 3)
+	assert.Equal(t, l.NumFreeIP4(resource2), 4)
+	assert.Equal(t, l.NumBusyIP4(resource2), 0)
 
-	p := l.GetFree(-1)
-	require.Nil(t, p)
+	p := l.GetFree(resource1, -1) // Unknown type
+	assert.Nil(t, p)
 
-	p = l.GetFree(Ip6)
-	require.Equal(t, l.NumFreeIP6(), 3)
-	require.Equal(t, l.NumBusyIP6(), 1)
-	l.SetFree(p, Ip6)
-	require.Equal(t, l.NumFreeIP6(), 4)
-	require.Equal(t, l.NumBusyIP6(), 0)
+	p = l.GetFree(resource2, Ip6)
+	assert.Equal(t, l.NumFreeIP4(resource1), 1)
+	assert.Equal(t, l.NumBusyIP4(resource1), 3)
+	assert.Equal(t, l.NumFreeIP6(resource2), 3)
+	assert.Equal(t, l.NumBusyIP6(resource2), 1)
+	l.SetFree(resource2, p, Ip6)
+	assert.Equal(t, l.NumFreeIP4(resource1), 1)
+	assert.Equal(t, l.NumBusyIP4(resource1), 3)
+	assert.Equal(t, l.NumFreeIP6(resource2), 4)
+	assert.Equal(t, l.NumBusyIP6(resource2), 0)
 
 	l = NewList()
+
 	badIP4, err = l.FromReaderIP4(bytes.NewReader(ip4))
-	require.Nil(t, err)
-	require.Len(t, badIP4, 1)
+	assert.Nil(t, err)
+	assert.Len(t, badIP4, 1)
+
 	badIP6, err = l.FromReaderIP6(bytes.NewReader(ip6))
-	require.Nil(t, err)
-	require.Len(t, badIP6, 1)
+	assert.Nil(t, err)
+	assert.Len(t, badIP6, 1)
 }
 
 func TestList_FromFile_bad(t *testing.T) {
@@ -92,31 +113,39 @@ func TestList_FromFile_bad(t *testing.T) {
 	badIP4, err = p.FromFile(testfileBad, Ip4)
 	require.Nil(t, err)
 
-	require.Len(t, badIP4, 2)
-	require.Equal(t, p.NumIP4(), 4)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
-	require.Equal(t, p.NumIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	resource1 := "parser_site.com"
+	resource2 := "parser_site.ru"
+
+	assert.Len(t, badIP4, 2)
+	assert.Equal(t, p.NumIP4(), 4)
+	assert.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	assert.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
+	assert.Equal(t, p.NumIP6(), 0)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
 	badIP6, err = p.FromFileIP6(testfileBad)
 	require.Nil(t, err)
 
-	require.Len(t, badIP4, 2)
-	require.Equal(t, p.NumIP4(), 4)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
-	require.Len(t, badIP6, 2)
-	require.Equal(t, p.NumIP6(), 4)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	assert.Len(t, badIP4, 2)
+	assert.Equal(t, p.NumIP4(), 4)
+	assert.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	assert.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
+	assert.Len(t, badIP6, 2)
+	assert.Equal(t, p.NumIP6(), 4)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 }
 
 func TestList_FromFile_good(t *testing.T) {
 	var (
-		/*ip4    []string
-		ip6    []string*/
 		badIP4 []string
 		badIP6 []string
 		err    error
 	)
+
+	resource1 := "parser_site.com"
+	resource2 := "parser_site.ru"
 
 	p := NewList()
 	badIP4, err = p.FromFile(testfile, Ip4)
@@ -124,27 +153,34 @@ func TestList_FromFile_good(t *testing.T) {
 
 	require.Len(t, badIP4, 0)
 	require.Equal(t, p.NumIP4(), 6)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
+	require.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	require.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
 	require.Equal(t, p.NumIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	require.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	require.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
 	badIP6, err = p.FromFile(testfile, Ip6)
 	require.Nil(t, err)
 
 	require.Len(t, badIP4, 0)
 	require.Equal(t, p.NumIP4(), 6)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
+	require.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	require.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
 	require.Len(t, badIP6, 0)
 	require.Equal(t, p.NumIP6(), 6)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	require.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	require.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	proxy := p.GetFree(Ip4)
+	proxy := p.GetFree(resource1, Ip4)
 	require.NotNil(t, proxy)
-	require.Equal(t, p.NumBusyIP4(), 1)
-	require.Equal(t, p.NumFreeIP4(), 5)
-	require.Equal(t, p.NumBusyIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), 6)
-
+	require.Equal(t, p.NumBusyIP4(resource1), 1)
+	require.Equal(t, p.NumFreeIP4(resource1), 5)
+	require.Equal(t, p.NumBusyIP6(resource1), 0)
+	require.Equal(t, p.NumFreeIP6(resource1), 6)
+	require.Equal(t, p.NumBusyIP4(resource2), 0)
+	require.Equal(t, p.NumFreeIP4(resource2), 6)
+	require.Equal(t, p.NumBusyIP6(resource2), 0)
+	require.Equal(t, p.NumFreeIP6(resource2), 6)
 }
 
 func TestList_FromFile(t *testing.T) {
@@ -163,27 +199,37 @@ func TestList_FromFile(t *testing.T) {
 	require.Len(t, badIP4, 0)
 	require.Nil(t, f.Close())
 
-	require.Equal(t, p.NumIP4(), 6)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
-	require.Equal(t, p.NumIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	resource1 := "parser_site.com"
+	resource2 := "parser_site.ru"
 
-	proxy := p.GetFree(Ip6)
-	require.Nil(t, proxy)
-	proxy = p.GetFree(Ip4)
-	require.NotNil(t, proxy)
-	require.Equal(t, p.NumBusyIP4(), 1)
-	require.Equal(t, p.NumFreeIP4(), 5)
-	require.Equal(t, p.NumIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	assert.Equal(t, p.NumIP4(), 6)
+	assert.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	assert.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
+	assert.Equal(t, p.NumIP6(), 0)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
+
+	proxy := p.GetFree(resource1, Ip6)
+	assert.Nil(t, proxy)
+	proxy = p.GetFree(resource1, Ip4)
+	assert.NotNil(t, proxy)
+	assert.Equal(t, p.NumBusyIP4(resource1), 1)
+	assert.Equal(t, p.NumFreeIP4(resource1), p.NumIP4()-1)
+	assert.Equal(t, p.NumBusyIP4(resource2), 0)
+	assert.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
+	assert.Equal(t, p.NumIP6(), 0)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
 	badIP4, err = p.FromFile(testfile, Ip4)
-	require.Nil(t, err)
-	require.Len(t, badIP4, 0)
-	require.Equal(t, p.NumIP4(), 6)
-	require.Equal(t, p.NumFreeIP4(), p.NumIP4())
-	require.Equal(t, p.NumIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	assert.Nil(t, err)
+	assert.Len(t, badIP4, 0)
+	assert.Equal(t, p.NumIP4(), 6)
+	assert.Equal(t, p.NumFreeIP4(resource1), p.NumIP4())
+	assert.Equal(t, p.NumFreeIP4(resource2), p.NumIP4())
+	assert.Equal(t, p.NumIP6(), 0)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
 	_, err = p.FromFile("not found", Ip4)
 	require.NotNil(t, err)
@@ -192,57 +238,67 @@ func TestList_FromFile(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	resource1 := "parser_site.com"
+	resource2 := "parser_site.ru"
+
 	p := NewList()
 	bad, err := p.FromFile(testfile, Ip6)
-	require.Nil(t, err)
-	require.Len(t, bad, 0)
-	require.Equal(t, p.NumIP6(), 6)
-	require.Equal(t, p.NumFreeIP6(), p.NumIP6())
+	assert.Nil(t, err)
+	assert.Len(t, bad, 0)
+	assert.Equal(t, p.NumIP6(), 6)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	var (
-		proxy1 *url.URL
-		proxy2 *url.URL
-	)
+	proxy1 := p.GetFree(resource1, Ip6)
+	assert.NotNil(t, proxy1)
+	assert.Equal(t, p.NumBusyIP6(resource1), 1)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6()-1)
+	assert.True(t, p.isBusy(resource1, proxy1, Ip6))
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	proxy1 = p.GetFree(Ip6)
-	require.NotNil(t, proxy1)
-	require.Equal(t, p.NumBusyIP6(), 1)
-	require.Equal(t, p.NumFreeIP6(), 5)
-	require.True(t, p.isBusy(proxy1, Ip6))
+	proxy2 := p.GetFree(resource1, Ip6)
+	assert.NotEqual(t, proxy1, proxy2)
+	assert.Equal(t, p.NumBusyIP6(resource1), 2)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6()-2)
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	proxy2 = p.GetFree(Ip6)
-	require.NotEqual(t, proxy1, proxy2)
-	require.Equal(t, p.NumBusyIP6(), 2)
-	require.Equal(t, p.NumFreeIP6(), 4)
+	p.SetFreeIP6(resource1, proxy1)
+	assert.Equal(t, p.NumBusyIP6(resource1), 1)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6()-1)
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	p.SetFreeIP6(proxy1)
-	require.Equal(t, p.NumBusyIP6(), 1)
-	require.Equal(t, p.NumFreeIP6(), 5)
+	p.setBusyIP6(resource1, proxy1)
+	assert.Equal(t, p.NumBusyIP6(resource1), 2)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6()-2)
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	p.setBusyIP6(proxy1)
-	require.Equal(t, p.NumBusyIP6(), 2)
-	require.Equal(t, p.NumFreeIP6(), 4)
-	p.SetFree(proxy1, Ip6)
+	p.SetFree(resource1, proxy1, Ip6)
+	p.SetFree(resource1, proxy2, Ip6)
+	assert.Equal(t, p.NumBusyIP6(resource1), 0)
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumFreeIP6(resource2), p.NumIP6())
 
-	p.SetFree(proxy2, Ip6)
-	require.Equal(t, p.NumBusyIP6(), 0)
-	require.Equal(t, p.NumFreeIP6(), 6)
-
-	// все занимаем
-	for i := 0; i < p.NumIP6()+20; i++ {
-		proxy1 = p.GetFreeIP6()
-		if i >= p.NumIP6() { // свободных нет
-			require.Nil(t, proxy1)
+	// everyone is busy
+	for i := 0; i < p.NumIP6()+1; i++ {
+		proxy1 = p.GetFreeIP6(resource2)
+		if i >= p.NumIP6() { // no free
+			assert.Nil(t, proxy1)
 		}
 	}
-
-	require.Equal(t, p.NumBusyIP6(), p.NumIP6())
+	assert.Equal(t, p.NumBusyIP6(resource2), p.NumIP6())
+	assert.Equal(t, p.NumFreeIP6(resource1), p.NumIP6())
 
 	bad, err = p.FromFile(testfile, Ip6)
-	require.Nil(t, err)
-	require.Len(t, bad, 0)
-	require.Equal(t, p.NumBusyIP6(), 0)
-	require.Equal(t, p.NumIP6(), 6)
+	assert.Nil(t, err)
+	assert.Len(t, bad, 0)
+	assert.Equal(t, p.NumBusyIP6(resource1), 0)
+	assert.Equal(t, p.NumBusyIP6(resource2), 0)
+	assert.Equal(t, p.NumIP6(), 6)
 }
 
 func TestList_Index(t *testing.T) {
@@ -251,16 +307,18 @@ func TestList_Index(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, bad, 0)
 
-	proxy := p.GetFreeIP6()
-	require.NotEqual(t, p.IndexIP6(proxy), -1)
-	require.Equal(t, p.IndexIP6(&url.URL{
+	resource := "parser_site.com"
+
+	proxy := p.GetFreeIP6(resource)
+	assert.NotEqual(t, p.IndexIP6(proxy), -1)
+	assert.Equal(t, p.IndexIP6(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.0",
 		Path:   "/",
 	}), -1)
 
-	require.Equal(t, p.IndexIP4(proxy), -1)
-	require.Equal(t, p.IndexIP4(&url.URL{
+	assert.Equal(t, p.IndexIP4(proxy), -1)
+	assert.Equal(t, p.IndexIP4(&url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.0",
 		Path:   "/",
@@ -273,6 +331,8 @@ func TestList_BusyFree(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, bad, 0)
 
+	resource := "parser_site.com"
+
 	unknownProxy := &url.URL{
 		Scheme: "http",
 		Host:   "127.0.0.0",
@@ -284,13 +344,13 @@ func TestList_BusyFree(t *testing.T) {
 		Host:   "12.33.12.34:12",
 	}
 
-	p.setBusyIP4(proxyFromTestfile)
-	p.setBusy(unknownProxy, Ip4)
-	require.True(t, p.isBusy(proxyFromTestfile, Ip4))
+	p.setBusyIP4(resource, proxyFromTestfile)
+	p.setBusy(resource, unknownProxy, Ip4)
+	assert.True(t, p.isBusy(resource, proxyFromTestfile, Ip4))
 
-	p.SetFreeIP4(unknownProxy)
-	require.False(t, p.isBusyIP4(unknownProxy))
-	require.False(t, p.isBusyIP6(unknownProxy))
+	p.SetFreeIP4(resource, unknownProxy)
+	assert.False(t, p.isBusyIP4(resource, unknownProxy))
+	assert.False(t, p.isBusyIP6(resource, unknownProxy))
 }
 
 func TestList_refresh(t *testing.T) {
@@ -300,11 +360,11 @@ func TestList_refresh(t *testing.T) {
 	)
 	p := NewList()
 	_, err = p.refresh([]byte("http://127.0.0.1"), -1)
-	require.NotNil(t, err)
+	assert.NotNil(t, err)
 
 	bad, err = p.refresh([]byte("fdgsdf"), Ip6)
-	require.Nil(t, err)
-	require.Len(t, bad, 1)
+	assert.Nil(t, err)
+	assert.Len(t, bad, 1)
 }
 
 func TestList_String(t *testing.T) {
@@ -312,12 +372,18 @@ func TestList_String(t *testing.T) {
 	_, _ = p.FromFile(testfile, Ip6)
 	_, _ = p.FromFileIP4(testfile)
 
-	p.GetFreeIP6()
-
 	sIP4 := p.StringIP4()
 	sIP6 := p.StringIP6()
-	require.Len(t, sIP4, 236)
-	require.Equal(t, len(sIP6), len(sIP4))
+	assert.Len(t, sIP4, 201)
+	assert.Equal(t, len(sIP6), len(sIP4))
+	assert.Equal(t, len(p.String()), len(sIP4)+len(sIP6)+1) // + \n
 
-	require.Equal(t, len(p.String()), len(sIP6)*2+1) // + \n
+	p = NewList()
+	_, _ = p.FromFileIP4(testfile)
+
+	sIP4 = p.StringIP4()
+	sIP6 = p.StringIP6()
+	assert.Len(t, sIP4, 201)
+	assert.Equal(t, len(sIP6), 57)
+	assert.Equal(t, len(p.String()), len(sIP4)+len(sIP6)+1) // + \n
 }

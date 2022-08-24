@@ -25,12 +25,6 @@ type List struct {
 	ip6      []*proxy
 }
 
-// proxy structure.
-type proxy struct {
-	busy bool
-	url  *url.URL
-}
-
 // NewList returns a pointer to a List structure.
 func NewList() (l *List) {
 	l = &List{
@@ -68,13 +62,14 @@ func listString(list []*proxy, typeIP int) (s string) {
 		s = "IP6"
 	}
 
-	s += "\n-----------------\nBUSY PROXY\n-----------------\n"
+	s = "-----------------\n" + s + " PROXY\n-----------------\n"
+	if len(list) == 0 {
+		s += "empty list\n"
+		return
+	}
+
 	for _, item := range list {
-		busy := "-"
-		if item.busy {
-			busy = "+"
-		}
-		s += " " + busy + "   " + item.url.String() + "\n"
+		s += item.String() + "\n"
 	}
 	return
 }
@@ -118,7 +113,7 @@ func (l *List) FromReaderIP6(r io.Reader) (bad []string, err error) {
 }
 
 // GetFree returns a free proxy and marks it as busy. typeIP - proxy type (Ip4 or Ip6).
-func (l *List) GetFree(typeIP int) *url.URL {
+func (l *List) GetFree(resource string, typeIP int) *url.URL {
 	var shuffleProxy []*proxy
 
 	switch typeIP {
@@ -149,8 +144,8 @@ func (l *List) GetFree(typeIP int) *url.URL {
 	}
 
 	for _, item := range shuffleProxy {
-		if !item.busy {
-			item.busy = true
+		if item.isFree(resource) {
+			item.setBusy(resource)
 			return item.url
 		}
 	}
@@ -159,17 +154,17 @@ func (l *List) GetFree(typeIP int) *url.URL {
 }
 
 // GetFreeIP4 returns a free proxy Ip4 and marks it as busy.
-func (l *List) GetFreeIP4() *url.URL {
-	return l.GetFree(Ip4)
+func (l *List) GetFreeIP4(resource string) *url.URL {
+	return l.GetFree(resource, Ip4)
 }
 
 // GetFreeIP6 returns a free proxy Ip6 and marks it as busy.
-func (l *List) GetFreeIP6() *url.URL {
-	return l.GetFree(Ip6)
+func (l *List) GetFreeIP6(resource string) *url.URL {
+	return l.GetFree(resource, Ip6)
 }
 
 // SetFree removes the busy flag from the proxy. typeIP - proxy type (Ip4 or Ip6).
-func (l *List) SetFree(u *url.URL, typeIP int) {
+func (l *List) SetFree(resource string, u *url.URL, typeIP int) {
 	var index int
 	if index = l.Index(u, typeIP); index < 0 {
 		return
@@ -178,24 +173,24 @@ func (l *List) SetFree(u *url.URL, typeIP int) {
 	switch typeIP {
 	case Ip4:
 		l.ip4Mutex.Lock()
-		l.ip4[index].busy = false
+		l.ip4[index].setFree(resource)
 		l.ip4Mutex.Unlock()
 
 	case Ip6:
 		l.ip6Mutex.Lock()
-		l.ip6[index].busy = false
+		l.ip6[index].setFree(resource)
 		l.ip6Mutex.Unlock()
 	}
 }
 
 // SetFreeIP4 removes the busy flag from the proxy IP4.
-func (l *List) SetFreeIP4(u *url.URL) {
-	l.SetFree(u, Ip4)
+func (l *List) SetFreeIP4(resource string, u *url.URL) {
+	l.SetFree(resource, u, Ip4)
 }
 
 // SetFreeIP6 removes the busy flag from the proxy IP6.
-func (l *List) SetFreeIP6(u *url.URL) {
-	l.SetFree(u, Ip6)
+func (l *List) SetFreeIP6(resource string, u *url.URL) {
+	l.SetFree(resource, u, Ip6)
 }
 
 // NumIP4 returns the total number of proxies.
@@ -213,10 +208,10 @@ func (l *List) NumIP6() int {
 }
 
 // NumBusyIP4 returns the number of busy proxies IP4.
-func (l *List) NumBusyIP4() (numBusy int) {
+func (l *List) NumBusyIP4(resource string) (numBusy int) {
 	l.ip4Mutex.RLock()
 	for _, item := range l.ip4 {
-		if item.busy {
+		if item.isBusy(resource) {
 			numBusy++
 		}
 	}
@@ -225,10 +220,10 @@ func (l *List) NumBusyIP4() (numBusy int) {
 }
 
 // NumBusyIP6 returns the number of busy proxies IP6.
-func (l *List) NumBusyIP6() (numBusy int) {
+func (l *List) NumBusyIP6(resource string) (numBusy int) {
 	l.ip6Mutex.RLock()
 	for _, item := range l.ip6 {
-		if item.busy {
+		if item.isBusy(resource) {
 			numBusy++
 		}
 	}
@@ -237,13 +232,13 @@ func (l *List) NumBusyIP6() (numBusy int) {
 }
 
 // NumFreeIP4 returns the number of free proxies.
-func (l *List) NumFreeIP4() (numFree int) {
-	return l.NumIP4() - l.NumBusyIP4()
+func (l *List) NumFreeIP4(resource string) (numFree int) {
+	return l.NumIP4() - l.NumBusyIP4(resource)
 }
 
 // NumFreeIP6 returns the number of free proxies.
-func (l *List) NumFreeIP6() (numFree int) {
-	return l.NumIP6() - l.NumBusyIP6()
+func (l *List) NumFreeIP6(resource string) (numFree int) {
+	return l.NumIP6() - l.NumBusyIP6(resource)
 }
 
 // parsing parses proxy list.
@@ -267,9 +262,7 @@ func (l *List) parsing(b []byte) (good []*proxy, bad []string) {
 			continue
 		}
 
-		good = append(good, &proxy{
-			url: u,
-		})
+		good = append(good, newProxy(u))
 	}
 	return
 }
@@ -313,7 +306,7 @@ func (l *List) refreshIP6(p []*proxy) {
 
 // isBusy returns whether the proxy is busy.
 // Always returns false if no proxy is found or unknown type.
-func (l *List) isBusy(u *url.URL, typeIP int) bool {
+func (l *List) isBusy(resource string, u *url.URL, typeIP int) bool {
 	var index int
 	// l.Index -1 if unknown type.
 	if index = l.Index(u, typeIP); index < 0 {
@@ -323,29 +316,29 @@ func (l *List) isBusy(u *url.URL, typeIP int) bool {
 	if typeIP == Ip4 {
 		l.ip4Mutex.RLock()
 		defer l.ip4Mutex.RUnlock()
-		return l.ip4[index].busy
+		return l.ip4[index].isBusy(resource)
 	}
 
 	// Ip6
 	l.ip6Mutex.RLock()
 	defer l.ip6Mutex.RUnlock()
-	return l.ip6[index].busy
+	return l.ip6[index].isBusy(resource)
 }
 
 // isBusyIP4 returns whether the proxy is busy.
 // Always returns false if no proxy is found or unknown type.
-func (l *List) isBusyIP4(u *url.URL) bool {
-	return l.isBusy(u, Ip4)
+func (l *List) isBusyIP4(resource string, u *url.URL) bool {
+	return l.isBusy(resource, u, Ip4)
 }
 
 // isBusyIP6 returns whether the proxy is busy.
 // Always returns false if no proxy is found or unknown type.
-func (l *List) isBusyIP6(u *url.URL) bool {
-	return l.isBusy(u, Ip6)
+func (l *List) isBusyIP6(resource string, u *url.URL) bool {
+	return l.isBusy(resource, u, Ip6)
 }
 
 // setBusy sets the busy flag to the proxy.
-func (l *List) setBusy(u *url.URL, typeIP int) {
+func (l *List) setBusy(resource string, u *url.URL, typeIP int) {
 	var index int
 	if index = l.Index(u, typeIP); index < 0 {
 		return
@@ -355,25 +348,25 @@ func (l *List) setBusy(u *url.URL, typeIP int) {
 	case Ip4:
 		l.ip4Mutex.RLock()
 		defer l.ip4Mutex.RUnlock()
-		l.ip4[index].busy = true
+		l.ip4[index].setBusy(resource)
 
 	case Ip6:
 		l.ip6Mutex.RLock()
 		defer l.ip6Mutex.RUnlock()
-		l.ip6[index].busy = true
+		l.ip6[index].setBusy(resource)
 	}
 
 	return
 }
 
 // setBusyIP4 sets the busy flag to the proxy IP4.
-func (l *List) setBusyIP4(u *url.URL) {
-	l.setBusy(u, Ip4)
+func (l *List) setBusyIP4(resource string, u *url.URL) {
+	l.setBusy(resource, u, Ip4)
 }
 
 // setBusyIP6 sets the busy flag to the proxy IP6.
-func (l *List) setBusyIP6(u *url.URL) {
-	l.setBusy(u, Ip6)
+func (l *List) setBusyIP6(resource string, u *url.URL) {
+	l.setBusy(resource, u, Ip6)
 }
 
 // Index returns the proxy index in the array.
@@ -385,7 +378,7 @@ func (l *List) Index(u *url.URL, typeIP int) (index int) {
 		defer l.ip4Mutex.RUnlock()
 
 		for i, p := range l.ip4 {
-			if p.url.String() == u.String() {
+			if p.Equal(u) {
 				return i
 			}
 		}
@@ -395,7 +388,7 @@ func (l *List) Index(u *url.URL, typeIP int) (index int) {
 		defer l.ip6Mutex.RUnlock()
 
 		for i, p := range l.ip6 {
-			if p.url.String() == u.String() {
+			if p.Equal(u) {
 				return i
 			}
 		}

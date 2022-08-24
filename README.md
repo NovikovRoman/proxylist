@@ -10,7 +10,7 @@
 ## Install
 
 ```shell
-go get github.com/NovikovRoman/proxylist/v2
+go get github.com/NovikovRoman/proxylist/v3
 ```
 
 ## Usage
@@ -50,8 +50,9 @@ The loaded a list shuffled.
 Get a free proxy:
 
 ```go
-proxy := p.GetFreeIP4()
-// or proxy := p.GetFree(proxylist.Ip4)
+resource := "site.com" // any resource name using a proxy
+proxy := p.GetFreeIP4(resource)
+// or proxy := p.GetFree(resource, proxylist.Ip4)
 if proxy == nil {
     panic("No free proxies.")
 }
@@ -60,8 +61,9 @@ if proxy == nil {
 After using the proxy, you need to free it:
 
 ```go
-p.SetFreeIP4(proxy)
-// or p.SetFree(proxylist.Ip4)
+resource := "site.com" // any resource name using a proxy
+p.SetFreeIP4(resource, proxy)
+// or p.SetFree(resource, proxylist.Ip4)
 ```
 
 Total number of proxies:
@@ -74,15 +76,17 @@ p.NumIP4()
 Number of free proxies:
 
 ```go
-p.NumFreeIP4()
-// or p.NumFree(proxylist.Ip4)
+resource := "site.com" // any resource name using a proxy
+p.NumFreeIP4(resource)
+// or p.NumFree(resource, proxylist.Ip4)
 ```
 
 Number of busy proxies:
 
 ```go
-p.NumBusyIP4()
-// or p.NumBusy(proxylist.Ip4)
+resource := "site.com" // any resource name using a proxy
+p.NumBusyIP4(resource)
+// or p.NumBusy(resource, proxylist.Ip4)
 ```
 
 ## Tests
