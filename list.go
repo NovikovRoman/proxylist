@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
@@ -81,7 +81,7 @@ func listString(list []*proxy, typeIP int) (s string) {
 // FromFile reads a list from a file. typeIP - proxy type (Ip4 or Ip6).
 func (l *List) FromFile(filename string, typeIP int) (bad []string, err error) {
 	var b []byte
-	if b, err = ioutil.ReadFile(filename); err != nil {
+	if b, err = os.ReadFile(filename); err != nil {
 		return
 	}
 	return l.refresh(b, typeIP)
@@ -100,7 +100,7 @@ func (l *List) FromFileIP6(filename string) (bad []string, err error) {
 // FromReader reads a list from io.Reader. typeIP - proxy type (Ip4 or Ip6).
 func (l *List) FromReader(r io.Reader, typeIP int) (bad []string, err error) {
 	var b []byte
-	if b, err = ioutil.ReadAll(r); err != nil {
+	if b, err = io.ReadAll(r); err != nil {
 		return
 	}
 	return l.refresh(b, typeIP)
@@ -359,8 +359,6 @@ func (l *List) setBusy(resource string, u *url.URL, typeIP int) {
 		defer l.ip6Mutex.RUnlock()
 		l.ip6[index].setBusy(resource)
 	}
-
-	return
 }
 
 // setBusyIP4 sets the busy flag to the proxy IP4.
